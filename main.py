@@ -1,12 +1,20 @@
 import argparse
+
 # import scipy.io.wavfile as wav
+from pedalboard import Pedalboard, Bitcrush
+from pedalboard.io import AudioFile, AudioStream
 import numpy as np
-:
 
 
 def add_dc_offset(input_file, output_file, offset, verbose: bool):
     if verbose:
         print(f"add_dc_offset({input_file}, {output_file}, {offset}, {verbose})")
+
+    with AudioFile(input_file) as infile:
+        with AudioFile(output_file, "w", f.samplerate, f.num_channels) as outfile:
+            data, type = infile.read()
+
+        rate, data = f.read()
     rate, data = wav.read(input_file)
     # Determine data type and limits
     if data.dtype == np.int16:
@@ -30,6 +38,12 @@ def add_dc_offset(input_file, output_file, offset, verbose: bool):
     wav.write(output_file, rate, data.astype(data.dtype))
 
 
+def open_and_play_audio(infile):
+    with AudioFile(infile) as f:
+        chunk = f.read(f.samplerate * f.duration)  # Play whole song as chunk..?
+    AudioStream.play(chunk, f.samplerate, "Mac mini Speakers")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", help="Verbose output mode.", action="store_true")
@@ -44,7 +58,8 @@ def main():
     if args.v:
         print(f"args: {args}")
 
-    add_dc_offset(args.infile, args.outfile, args.dc_offset, args.v)
+    # add_dc_offset(args.infile, args.outfile, args.dc_offset, args.v)
+    open_and_play_audio(args.infile)
 
 
 if __name__ == "__main__":  # Entrypoint
