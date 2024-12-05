@@ -1,6 +1,7 @@
 import argparse
-import scipy.io.wavfile as wav
+# import scipy.io.wavfile as wav
 import numpy as np
+:
 
 
 def add_dc_offset(input_file, output_file, offset, verbose: bool):
