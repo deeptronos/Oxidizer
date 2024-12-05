@@ -18,6 +18,7 @@ def add_dc_offset(input_file, output_file, offset, verbose: bool):
         raise ValueError("Unsupported data type: {}".format(data.dtype))
 
     if verbose:
+        print(f"Data Type: {data.dtype}")
         print(f"Sample Rate: {rate}")
         print(f"Data Shape: {data.shape}")
 
