@@ -156,9 +156,21 @@ class WaveformApp(App):
         # self.numbers = self.value = str(Decimal(self.value or "0") * -1)
 
     def on_mount(self) -> None:
-        self.query_one(Canvas).border_title = f"{self.wav_file_path}"
-        self.query_one(Canvas).border_title = f"{self.wav_file_path}"
-        # self.query_one(SelectionList).border_title = "Audio Effects "
+        self.log("Querying and applying titles...")
+        # self.source_wf.border_subtitle = "SOURCE"
+        # res1 = self.query_one("#source-wf").border_sub_title = f"{self.wav_file_path}"
+        # # res1 = self.query_one("#source-wf").border_sub_title = "SOURCE"
+        # res2 = self.query_one("#modified-wf").border_title = f"{self.wav_file_path}"
+        # self.log(f"res1: {res1}, res2: {res2}")
+        # for container in self.query("#source-wf"):
+            # self.log(f"QUERY: {container}")
+        self.query("#source-wf")[0].query_one("WaveformCanvas").border_title = "SOURCE"
+        self.query("#modified-wf")[0].query_one("WaveformCanvas").border_title = "RESULT"
+        (_, _, _, modified_subtitle) = self.ts.read()
+        self.query("#source-wf")[0].query_one("WaveformCanvas").border_subtitle= f"{self.wav_file_path}"
+        self.query("#modified-wf")[0].query_one("WaveformCanvas").border_subtitle= f"{modified_subtitle}"
+            # container.border_title = "SOURCE?"
+        self.query_one(SelectionList).border_title = "Audio Effects "
 
 
 class WaveformCanvas(Canvas):
