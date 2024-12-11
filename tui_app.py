@@ -133,9 +133,9 @@ class WaveformApp(App):
 
         with Container(id="grid-prog"):
             # yield Digits("Catherine's 0\u03c7idizer", id="logo")
-            self.source_wf = Container(WaveformCanvas(self.wav_file_path, 15, 15), classes="wf", id="source-wf")
+            self.source_wf = Container(WaveformCanvas(self.wav_file_path, 150, 20), classes="wf", id="source-wf")
             (temprate, tempdata, tempinfo, temppath) = self.ts.read()
-            self.modified_wf = Container(WaveformCanvas(temppath, 15, 15), classes="wf", id="modified-wf")
+            self.modified_wf = Container(WaveformCanvas(temppath, 150, 20), classes="wf", id="modified-wf")
             
 
             # self.mount(self.source_wf)
@@ -156,20 +156,12 @@ class WaveformApp(App):
         # self.numbers = self.value = str(Decimal(self.value or "0") * -1)
 
     def on_mount(self) -> None:
-        self.log("Querying and applying titles...")
-        # self.source_wf.border_subtitle = "SOURCE"
-        # res1 = self.query_one("#source-wf").border_sub_title = f"{self.wav_file_path}"
-        # # res1 = self.query_one("#source-wf").border_sub_title = "SOURCE"
-        # res2 = self.query_one("#modified-wf").border_title = f"{self.wav_file_path}"
-        # self.log(f"res1: {res1}, res2: {res2}")
-        # for container in self.query("#source-wf"):
-            # self.log(f"QUERY: {container}")
         self.query("#source-wf")[0].query_one("WaveformCanvas").border_title = "SOURCE"
         self.query("#modified-wf")[0].query_one("WaveformCanvas").border_title = "RESULT"
         (_, _, _, modified_subtitle) = self.ts.read()
         self.query("#source-wf")[0].query_one("WaveformCanvas").border_subtitle= f"{self.wav_file_path}"
         self.query("#modified-wf")[0].query_one("WaveformCanvas").border_subtitle= f"{modified_subtitle}"
-            # container.border_title = "SOURCE?"
+
         self.query_one(SelectionList).border_title = "Audio Effects "
 
 
@@ -186,7 +178,7 @@ class WaveformCanvas(Canvas):
         self.load_and_draw_waveform()
 
     def draw_grid(self):
-        width, height = (15, 15)
+        width, height = (self.width, self.height)
         step = 10
         for x in range(0, width, step):
             self.draw_line(x, 0, x, height, Color(255, 255, 255))
@@ -211,7 +203,7 @@ class WaveformCanvas(Canvas):
             data = np.frombuffer(data, dtype=datatype)
 
             #  Downsample for display
-            width, height = (15, 15)
+            width, height = (self.width, self.height)
             downsample_factor = max(1, len(data) // width)
             downsampled_data = data[::downsample_factor]
 
