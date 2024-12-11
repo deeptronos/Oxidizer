@@ -5,6 +5,7 @@ from pedalboard import *  # Pedalboard, Bitcrush
 from pedalboard.io import AudioFile, AudioStream
 import numpy as np
 
+
 def enumerate_plugins() -> list:
     return list(Plugin.__subclasses__())
 

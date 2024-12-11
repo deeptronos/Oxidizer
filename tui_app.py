@@ -6,7 +6,7 @@ from textual.app import App, ComposeResult
 from textual_canvas import Canvas
 from textual.widgets import Header, Footer, Button, Digits, SelectionList, OptionList
 from textual.widgets.selection_list import Selection
-from textual.containers import Container, Horizontal, Vertical 
+from textual.containers import Container, Horizontal, Vertical
 from textual.color import Color
 
 
@@ -20,11 +20,12 @@ def SelectionPlugins():
     """A list of all plugins supplied to the user. Plugins originate from Pedalboard as well as myself."""
     out = list()
     for cls in Plugin.__subclasses__():
-        s = Selection( cls.__name__, cls.__name__[::2   ] )
+        s = Selection(cls.__name__, cls.__name__[::2])
         assert isinstance(s, Selection)
         out.append(s)
-        
+
     return out
+
 
 class WaveformApp(App):
     """A Textual app to display a waveform from a WAV file."""
@@ -39,19 +40,18 @@ class WaveformApp(App):
         """Create child widgets for the app."""
         yield Digits("Catherine's 0\u03c7idizer", id="logo")
         yield Header()
-        
+
         with Container(id="prog"):
             # yield Digits("Catherine's 0\u03c7idizer", id="logo")
             self.wf = Container(WaveformCanvas(self.wav_file_path, 15, 15))
-            
+
             yield Container(SelectionList(*SelectionPlugins()), id="plugins")
-            
+
             self.mount(self.wf)
             yield self.wf
             yield Horizontal(
                 Button("Export", id="export", variant="primary"),
-                Button('Play', id='play', variant="success"),
-                
+                Button("Play", id="play", variant="success"),
             )
 
         yield Footer()

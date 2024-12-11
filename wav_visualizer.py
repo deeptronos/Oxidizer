@@ -8,7 +8,6 @@ from textual.containers import Container
 from textual.color import Color
 
 
-
 import scipy.io.wavfile as wav
 from pedalboard import *  # Pedalboard, Bitcrush
 from pedalboard.io import AudioFile, AudioStream
@@ -29,7 +28,7 @@ class WaveformApp(App):
         yield Header()
         yield Footer()
 
-        self.wf =  Container(WaveformCanvas(self.wav_file_path, 15, 15))
+        self.wf = Container(WaveformCanvas(self.wav_file_path, 15, 15))
         self.mount(self.wf)
 
 
@@ -48,7 +47,7 @@ class WaveformCanvas(Canvas):
         self.load_and_draw_waveform()
 
     def draw_grid(self):
-        width, height = (15,15)
+        width, height = (15, 15)
         step = 10
         for x in range(0, width, step):
             self.draw_line(x, 0, x, height, Color(255, 255, 255))
@@ -60,7 +59,6 @@ class WaveformCanvas(Canvas):
 
     def test_file_loading(self):
         with AudioFile(self.wav_file_path) as infile:
-
             data = infile.read(step_size_in_samples)
             sample_rate = infile.samplerate
             num_channels = infile.num_channels
@@ -90,9 +88,9 @@ class WaveformCanvas(Canvas):
             else:
                 raise ValueError(f"Unsupported data type: {datatype}")
 
-            data = np.clip(data, info.min, info.max) 
+            data = np.clip(data, info.min, info.max)
             data = np.frombuffer(data, dtype=datatype)
-   
+
             #  Downsample for display
             width, height = (15, 15)
             downsample_factor = max(1, len(data) // width)
@@ -107,16 +105,21 @@ class WaveformCanvas(Canvas):
 
             # Remap the range from [-<half canvas height>, +<half canvas height>] to [0, <canvas height>]
             half_canvas_height = height / 2
-            remapped_data = (normalized_data + half_canvas_height) * (height / (2 * half_canvas_height))
+            remapped_data = (normalized_data + half_canvas_height) * (
+                height / (2 * half_canvas_height)
+            )
 
-            print(f"original data: {data}, downsampled: {downsampled_data}, normalized_data: {normalized_data}, remapped data: {remapped_data}")
+            print(
+                f"original data: {data}, downsampled: {downsampled_data}, normalized_data: {normalized_data}, remapped data: {remapped_data}"
+            )
             for x in range(len(remapped_data)):
                 y = remapped_data[x]
                 if x == 0:
-                    self.draw_line(0, int(y), 0, int(y), Color(0,0,255))
+                    self.draw_line(0, int(y), 0, int(y), Color(0, 0, 255))
                 else:
-                    self.draw_line(x-1, int(remapped_data[x-1]), x, int(y) , Color(0,0,255))
-
+                    self.draw_line(
+                        x - 1, int(remapped_data[x - 1]), x, int(y), Color(0, 0, 255)
+                    )
 
         except FileNotFoundError:
             self.log(f"Error: File not found: {self.wav_file_path}")
@@ -124,6 +127,7 @@ class WaveformCanvas(Canvas):
             self.log(f"Error reading WAV file: {e}")
         except Exception as e:
             self.log(f"An unexpected error occurred: {e}")
+
 
 def main():
     """Entry point for the app."""
@@ -134,6 +138,7 @@ def main():
     wav_file_path = sys.argv[1]
     app = WaveformApp(wav_file_path)
     app.run()
+
 
 if __name__ == "__main__":
     main()
