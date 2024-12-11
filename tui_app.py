@@ -15,6 +15,95 @@ from pedalboard import Plugin  # Pedalboard, Bitcrush
 from pedalboard.io import AudioFile, AudioStream
 import numpy as np
 
+class TempStore():
+    """A class that can store one WAV file in `/temp`, for manipulation."""
+    def __init__(self, original_file):
+        self._temppath = "temp/temp.wav" # The path where temps will be written/read from.
+        self._originalpath  = original_file # The path of the original that we're storing temporaries of.
+        try:
+            rate, data = wav.read(self._originalpath)
+            datatype = data.dtype
+            if datatype == np.int16:
+                info = np.iinfo(np.int16)
+            elif datatype == np.int32:
+                info = np.iinfo(np.int16)
+            elif datatype == np.float32:
+                info = np.finfo(np.float32)
+            else:
+                raise ValueError(f"Unsupported data type: {datatype}")
+
+            self._rate = rate # Samplerate
+            self._data = data # Original sample's data
+            self._info = info # Data type info
+            print("Writing temp wav...")
+            
+        except FileNotFoundError:
+            print(f"Error: File not found: {self._originalpath}")
+        except wave.Error as e:
+            print(f"Error reading WAV file: {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+        wav.write(self._temppath, self._rate, self._data)
+
+
+    def _get_data_dtype(self, data):
+        """Get the data type of data."""
+        datatype = data.dtype
+        if datatype == np.int16:
+            info = np.iinfo(np.int16)
+        elif datatype == np.int32:
+            info = np.iinfo(np.int16)
+        elif datatype == np.float32:
+            info = np.finfo(np.float32)
+        else:
+            raise ValueError(f"Unsupported data type: {datatype}")
+        
+        return info
+
+
+
+    def _write_to_temp(self, data):
+        """Writes the given data to a temp WAV file of rate self._rate and info self._info."""
+        self._info = self._get_data_dtype(data)
+        data = np.clip(data, self._info.min, self._info.max)  # Ensure data is within valid range
+        wav.write(self._temppath, self._rate, data.astype(self._info.dtype))
+    
+    def _read_from_temp(self):
+        """Returns a tuple containing the (rate, data, info) read from temp store."""
+        try:
+            rate, data = wav.read(self._temppath)
+            datatype = data.dtype
+            if datatype == np.int16:
+                info = np.iinfo(np.int16)
+            elif datatype == np.int32:
+                info = np.iinfo(np.int16)
+            elif datatype == np.float32:
+                info = np.finfo(np.float32)
+            else:
+                raise ValueError(f"Unsupported data type: {datatype}")
+
+            self._rate = rate # Samplerate
+            self._data = data # Original sample's data
+            self._info = info # Data type info
+            return(self._rate, self._data, self._info)
+        except FileNotFoundError:
+            print(f"Error: File not found: {self._temppath}")
+        except wave.Error as e:
+            print(f"Error reading WAV file: {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+
+    def store(self, data):
+        """Store data in a temp WAV. The stored WAV will have the rate and info.dtype of the sample initially passed during construction of TempStore."""
+        self._data = data
+        self._write_to_temp(self.data)
+    
+    def read(self):
+        """Returns a tuple containing the (rate, data, info, temppath) read from temp store. Temppath is the path of the file in the TempStore()."""
+        out_tuple = self._read_from_temp()
+        out = list(out_tuple)+list([self._temppath])
+        return tuple(out)
+
 
 def SelectionPlugins():
     """A list of all plugins supplied to the user. Plugins originate from Pedalboard as well as myself."""
@@ -35,20 +124,25 @@ class WaveformApp(App):
     def __init__(self, wav_file_path):
         super().__init__()
         self.wav_file_path = wav_file_path
+        self.ts = TempStore(self.wav_file_path) # The TempStore() backing the output waveform.
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         yield Digits("Catherine's 0\u03c7idizer", id="logo")
         yield Header()
 
-        with Container(id="prog"):
+        with Container(id="grid-prog"):
             # yield Digits("Catherine's 0\u03c7idizer", id="logo")
-            self.wf = Container(WaveformCanvas(self.wav_file_path, 15, 15))
+            self.source_wf = Container(WaveformCanvas(self.wav_file_path, 15, 15), classes="wf", id="source-wf")
+            (temprate, tempdata, tempinfo, temppath) = self.ts.read()
+            self.modified_wf = Container(WaveformCanvas(temppath, 15, 15), classes="wf", id="modified-wf")
+            
 
+            # self.mount(self.source_wf)
+            # self.mount(self.modified_wf)
+            yield self.source_wf
+            yield self.modified_wf
             yield Container(SelectionList(*SelectionPlugins()), id="plugins")
-
-            self.mount(self.wf)
-            yield self.wf
             yield Horizontal(
                 Button("Export", id="export", variant="primary"),
                 Button("Play", id="play", variant="success"),
@@ -62,6 +156,7 @@ class WaveformApp(App):
         # self.numbers = self.value = str(Decimal(self.value or "0") * -1)
 
     def on_mount(self) -> None:
+        self.query_one(Canvas).border_title = f"{self.wav_file_path}"
         self.query_one(Canvas).border_title = f"{self.wav_file_path}"
         # self.query_one(SelectionList).border_title = "Audio Effects "
 

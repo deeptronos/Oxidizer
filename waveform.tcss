@@ -9,7 +9,17 @@ WaveformCanvas {
     border: solid white;
 }
 
+#grid-prog{
+    layout: grid;
+    grid-size: 2 2;
+    grid-columns:  1fr 1fr;
+}
+
 #plugins {
     width: 1fr;
     height: 1fr;
+}
+
+.waveform_display{
+
 }
