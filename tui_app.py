@@ -6,7 +6,7 @@ from textual.app import App, ComposeResult
 from textual_canvas import Canvas
 from textual.widgets import Header, Footer, Button, Digits, SelectionList, OptionList
 from textual.widgets.selection_list import Selection
-from textual.containers import Container
+from textual.containers import Container, Horizontal, Vertical 
 from textual.color import Color
 
 
@@ -43,14 +43,16 @@ class WaveformApp(App):
         with Container(id="prog"):
             # yield Digits("Catherine's 0\u03c7idizer", id="logo")
             self.wf = Container(WaveformCanvas(self.wav_file_path, 15, 15))
-
-            yield SelectionList(*SelectionPlugins())
+            
+            yield Container(SelectionList(*SelectionPlugins()), id="plugins")
             
             self.mount(self.wf)
             yield self.wf
-            yield Button("Export", id="export", variant="primary")
-
-            # yield Button('Play', id='play', variant="success"
+            yield Horizontal(
+                Button("Export", id="export", variant="primary"),
+                Button('Play', id='play', variant="success"),
+                
+            )
 
         yield Footer()
 
@@ -61,7 +63,7 @@ class WaveformApp(App):
 
     def on_mount(self) -> None:
         self.query_one(Canvas).border_title = f"{self.wav_file_path}"
-        self.query_one(SelectionList).border_title = "Audio Effects "
+        # self.query_one(SelectionList).border_title = "Audio Effects "
 
 
 class WaveformCanvas(Canvas):
