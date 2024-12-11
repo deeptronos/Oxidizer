@@ -1,0 +1,10 @@
+Screen {
+    align: center middle;
+}
+
+
+WaveformCanvas {
+    width: 1fr;
+    height: 1fr;
+    border: solid white;
+}

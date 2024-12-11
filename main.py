@@ -1,9 +1,12 @@
 import argparse
 
-# import scipy.io.wavfile as wav
-from pedalboard import Pedalboard, Bitcrush
+import scipy.io.wavfile as wav
+from pedalboard import *  # Pedalboard, Bitcrush
 from pedalboard.io import AudioFile, AudioStream
 import numpy as np
+
+def enumerate_plugins() -> list:
+    return list(Plugin.__subclasses__())
 
 
 def add_dc_offset(input_file, output_file, offset, verbose: bool):
