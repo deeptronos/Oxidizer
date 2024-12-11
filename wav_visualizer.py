@@ -80,13 +80,6 @@ class WaveformCanvas(Canvas):
     def load_and_draw_waveform(self):
         """Loads the WAV file and draws the waveform."""
         try:
-            # with AudioFile(self.wav_file_path) as infile:
-                # data, type = infile.read()
-                # data = infile.read(step_size_in_samples)
-                # data = infile.read()
-                # sample_rate = infile.samplerate
-                # num_channels = infile.num_channels
-                # datatype = data.dtype
             rate, data = wav.read(self.wav_file_path)
             datatype = data.dtype
             if datatype == np.int16:
@@ -100,16 +93,13 @@ class WaveformCanvas(Canvas):
 
             data = np.clip(data, info.min, info.max) 
             data = np.frombuffer(data, dtype=datatype)
-            # print(f"Num channels? {len(data)}")
-            # if num_channels > 1:
-            #         data = data.reshape(-1, num_channels).mean(axis=1)
-
-          #  Downsample for display
+   
+            #  Downsample for display
             width, height = (15, 15)
             downsample_factor = max(1, len(data) // width)
             downsampled_data = data[::downsample_factor]
 
-                # Normalize to fit the canvas height
+            # Normalize to fit the canvas height
             max_val = np.max(np.abs(downsampled_data))
             if max_val > 0:
                 normalized_data = (downsampled_data / (max_val)) * (height / 2)
