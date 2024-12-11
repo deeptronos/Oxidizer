@@ -1,9 +1,10 @@
 import sys
 import wave
 import numpy as np
+from textual import events, on
 from textual.app import App, ComposeResult
 from textual_canvas import Canvas
-from textual.widgets import Header, Footer
+from textual.widgets import Header, Footer, Button, Digits
 from textual.containers import Container
 from textual.color import Color
 
@@ -27,10 +28,20 @@ class WaveformApp(App):
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         yield Header()
+        with Container(id="prog"):
+            yield Digits("0\u03C7", id="logo")
+            self.wf = Container(WaveformCanvas(self.wav_file_path, 15, 15))
+            # self.mount(self.wf)
+            yield self.wf
+            yield Button('Export', id='export', variant="primary")
+            # yield 
+            # yield Button('Play', id='play', variant="success"
         yield Footer()
 
-        self.wf =  Container(WaveformCanvas(self.wav_file_path, 15, 15))
-        self.mount(self.wf)
+    @on(Button.Pressed, "#export")
+    def plus_minus_pressed(self) -> None:
+        """Pressed Export"""
+        # self.numbers = self.value = str(Decimal(self.value or "0") * -1)
 
 
 class WaveformCanvas(Canvas):
@@ -42,8 +53,6 @@ class WaveformCanvas(Canvas):
 
     def on_mount(self) -> None:
         """Called when the widget is mounted. Load and draw the waveform."""
-        print("!trying to load and draw waveform!")
-        self.test()
         # self.draw_grid()
         self.load_and_draw_waveform()
 
@@ -54,27 +63,6 @@ class WaveformCanvas(Canvas):
             self.draw_line(x, 0, x, height, Color(255, 255, 255))
         for y in range(0, height, step):
             self.draw_line(0, y, width, y, Color(255, 255, 255))
-
-    def test(self):
-        print("test called")
-
-    def test_file_loading(self):
-        with AudioFile(self.wav_file_path) as infile:
-
-            data = infile.read(step_size_in_samples)
-            sample_rate = infile.samplerate
-            num_channels = infile.num_channels
-
-            datatype = data.dtype
-
-            if datatype == np.int16:
-                info = np.iinfo(np.int16)
-            elif datatype == np.int32:
-                info = np.iinfo(np.int16)
-            elif datatype == np.float32:
-                info = np.finfo(np.float32)
-            else:
-                raise ValueError(f"Unsupported data type: {datatype}")
 
     def load_and_draw_waveform(self):
         """Loads the WAV file and draws the waveform."""
@@ -92,7 +80,7 @@ class WaveformCanvas(Canvas):
 
             data = np.clip(data, info.min, info.max) 
             data = np.frombuffer(data, dtype=datatype)
-   
+
             #  Downsample for display
             width, height = (15, 15)
             downsample_factor = max(1, len(data) // width)
@@ -108,6 +96,7 @@ class WaveformCanvas(Canvas):
             # Remap the range from [-<half canvas height>, +<half canvas height>] to [0, <canvas height>]
             half_canvas_height = height / 2
             remapped_data = (normalized_data + half_canvas_height) * (height / (2 * half_canvas_height))
+
 
             print(f"original data: {data}, downsampled: {downsampled_data}, normalized_data: {normalized_data}, remapped data: {remapped_data}")
             for x in range(len(remapped_data)):

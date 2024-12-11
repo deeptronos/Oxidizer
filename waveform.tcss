@@ -5,6 +5,6 @@ Screen {
 
 WaveformCanvas {
     width: 1fr;
-    height: 1fr;
+    height: 2fr;
     border: solid white;
 }
