@@ -17,12 +17,7 @@ import numpy as np
 
 
 def SelectionPlugins():
-    """A SelectionList of all plugins supplied by Pedalboard."""
-    # eep = SelectionList[str]()  # Corrected to specify the type list[str]
-    # for indx, val in enumerate(cls.__name__ for cls in Plugin.__subclasses__()):
-    #     # eep.add_option(Selection(value=val,prompt=val[::3]))
-    #     eep.add_option((val, val[::3]))
-    # return eep  # Return a list of selections
+    """A list of all plugins supplied to the user. Plugins originate from Pedalboard as well as myself."""
     out = list()
     for cls in Plugin.__subclasses__():
         s = Selection( cls.__name__, cls.__name__[::2   ] )
@@ -48,64 +43,9 @@ class WaveformApp(App):
         with Container(id="prog"):
             # yield Digits("Catherine's 0\u03c7idizer", id="logo")
             self.wf = Container(WaveformCanvas(self.wav_file_path, 15, 15))
-            # yield OptionList(
-            # "Aerilon",
-            # "Aquaria",
-            # "Canceron",
-            # "Caprica",
-            # "Gemenon",
-            # "Leonis",
-            # "Libran",
-            # "Picon",
-            # "Sagittaron",
-            # "Scorpia",
-            # "Tauron",
-            # "Virgon",
-            # )
-            enums =SelectionList(*SelectionPlugins())
-            # p=  SelectionList[int]()
-            # for indx, plug in enums:
-            #     p.add_option(Selection(indx,plug, False))
-            # yield OptionList(*plugs)
-            yield enums
-            # with Container(id="plugin-list"):
-            #     # for i in enumerate(enumerate_plugins):
-            #     # print(f"Plugin: {i}")
-            #     # yield SelectionList[str](SelectionPlugins())
-            #     yield OptionList(SelectionPlugins())
-            #     # for i in enumerate(enumerate_plugins):
-                # print(f"Plugin: {i}")
-                # self.plugins = SelectionList[str]()
-                # i = 0
-                # for p in enumerate_plugins():
-                #     i = i + 1
-                #     # self.plugins.add_options(items=[p,p,False])
-                #     plugin = Selection(p, p, False)
-                #     # self.plugins.add_option(Selection(p,p,False))
-                #     self.plugins.add_option(plugin)
 
-                # yield self.plugins
-                # plugins = plugins.add_options(items=[Selection("DC Offset", "dc_offset", True)])
-                # for plugin in enumerate_plugins():
-                # plugins = plugins.add_options(items=Selection(plugin, plugin, False))
-                # plugins.add_options(SelectionList[str](*enumerate_plugins()))
-                # yield plugins
-                # plugins = SelectionList[str](*enumerate_plugins())
-                # print(f"Selections List: {plugins}")
-                # plugins.select(enumerate_plugins()[0])
-                # yield plugins
-                # yield SelectionList[str](*enumerate_plugins())
-                # yield SelectionList[str](
-                #     Selection("Falken's Maze", "secret_back_door", True),
-                #     Selection("Black Jack", "black_jack"),
-                #     Selection("Gin Rummy", "gin_rummy"),
-                #     Selection("Hearts", "hearts"),
-                #     Selection("Bridge", "bridge"),
-                #     Selection("Checkers", "checkers"),
-                #     Selection("Chess", "a_nice_game_of_chess", True),
-                #     Selection("Poker", "poker"),
-                #     Selection("Fighter Combat", "fighter_combat", True),
-                # )
+            yield SelectionList(*SelectionPlugins())
+            
             self.mount(self.wf)
             yield self.wf
             yield Button("Export", id="export", variant="primary")
@@ -119,8 +59,9 @@ class WaveformApp(App):
         """Pressed Export"""
         # self.numbers = self.value = str(Decimal(self.value or "0") * -1)
 
-    # def on_mount(self) -> None:
-        # self.query_one(SelectionList).border_title = "Shall we play some games?"
+    def on_mount(self) -> None:
+        self.query_one(Canvas).border_title = f"{self.wav_file_path}"
+        self.query_one(SelectionList).border_title = "Audio Effects "
 
 
 class WaveformCanvas(Canvas):
