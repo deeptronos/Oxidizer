@@ -8,3 +8,7 @@ WaveformCanvas {
     height: 2fr;
     border: solid white;
 }
+
+PluginList{
+    border: solid pink;
+}
