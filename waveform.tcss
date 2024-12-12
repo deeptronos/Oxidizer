@@ -14,13 +14,17 @@ WaveformCanvas {
 
 #grid-prog{
     layout: grid;
-    grid-size: 2 2;
+    grid-size: 2 3 ;
     grid-columns:  1fr 1fr;
 }
 
 #plugin-selection-list {
     width: 1fr;
     height: 1fr;
+}
+
+Input{
+    width: 1fr;
 }
 
 

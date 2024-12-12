@@ -6,7 +6,7 @@ from textual import events, on
 from textual.app import App, ComposeResult
 from textual_canvas import Canvas
 from textual.widget import Widget
-from textual.widgets import Header, Footer, Button, Digits, SelectionList, OptionList, Input
+from textual.widgets import Header, Footer, Button, Digits, SelectionList, OptionList, Input, Label
 from textual.widgets.selection_list import Selection
 from textual.message import Message
 from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
@@ -39,10 +39,13 @@ def get_all_methods_details(class_name):
 
 
 def SelectionPlugins():
-    """A list of all plugins supplied to the user. Plugins originate from Pedalboard as well as myself."""
+    """A list of all Pedalboard plugins supplied to the user."""
     out = list()
+    banned_plugins=["PluginContainer", "Convolution", "Resample", "IIRFilter", "PrimeWithSilenceTestPlugin", "AddLatency", "ResampleWithLatency", "FixedSizeBlockTestPlugin", "ForceMonoTestPlugin", "ExternalPlugin"]
     for cls in Plugin.__subclasses__():
         # s = Selection(cls.__name__, cls.__name__[::2])
+        if cls.__name__ in banned_plugins:
+            continue
         s = Selection(cls.__name__, cls.__name__)
         assert isinstance(s, Selection)
         out.append(s)
@@ -131,7 +134,7 @@ class TempStore():
     def store(self, data):
         """Store data in a temp WAV. The stored WAV will have the rate and info.dtype of the sample initially passed during construction of TempStore."""
         self._data = data
-        self._write_to_temp(self.data)
+        self._write_to_temp(data)
     
     def read(self):
         """Returns a tuple containing the (rate, data, info, temppath) read from temp store. Temppath is the path of the file in the TempStore()."""
@@ -190,6 +193,7 @@ FX are applied to audio in the order in which they are added to the Pedalboard.
         self._pedalboard = Pedalboard()
         self._ts = temp_store
         self._load_source_audio()
+        self._dc_offset = 0
 
     def _load_source_audio(self):
         """Read data from the file at _source_file_path into _data"""
@@ -209,6 +213,15 @@ FX are applied to audio in the order in which they are added to the Pedalboard.
                 effected = self._pedalboard(chunk, infile.samplerate, reset=True)
 
                 outfile.write(effected)
+
+    def _update_dc_offset(self):
+        """Update the DC Offset of the audio signal."""
+        (rate, source_data, info, temppath) = self._ts.read()
+        print(f"self._dc_offset: {self._dc_offset}")
+        modified_data = source_data + (int(self._dc_offset).astype(source_data.dtype))
+        
+        modified_data = np.clip(modified_data, info.min, info.max)
+        self._ts.store(modified_data)
 
     def enable_plugin(self, plugin_name:str):
         """Add the given plugin to the end of the Pedalboard Effects chain."""
@@ -237,8 +250,16 @@ FX are applied to audio in the order in which they are added to the Pedalboard.
         else:
             pass
 
+    def set_dc_offset(self, offset):
+        self._dc_offset = offset
+        self._update_dc_offset()
+
+    def get_dc_offset(self):
+        return self._dc_offset
+    
     def get_pedalboard(self) -> Pedalboard:
         return self._pedalboard
+
 
 class PluginContainer(ScrollableContainer):
     """Responsible for a widget displaying active audio FX and their inputs.
@@ -263,6 +284,12 @@ class WaveformApp(App):
     """A Textual app to display a waveform from a WAV file."""
 
     CSS_PATH = "waveform.tcss"
+
+    class DCInputChanged(Message):
+        """Input has been changed message."""
+        def __init__(self, value:int) -> None:
+            self.value = value
+            super.__init__()
 
     def __init__(self, wav_file_path):
         super().__init__()
@@ -293,7 +320,17 @@ class WaveformApp(App):
             yield Container(SelectionList(*SelectionPlugins()), id="plugin-selection-list")
             self._plugin_interactables = PluginContainer()
             self._plugin_interactables.set_fx_source(self.fx)
+            # with Container(id="dc-offset"):
+            #     yield Label("DC OFFSET:")
+            #     yield Input(placeholder="0", type="integer")
+            dc_input = Input(placeholder="0", type="integer", id="dc-offset-input")
+            dc_input.border_title = "DC Offset"
+            dc_input.border_subtitle = "Press <enter> to submit."
+            yield Horizontal(
+                dc_input
+            )
             self._interactions = Container(self._plugin_interactables,id="plugin-interactions")
+           
             yield Horizontal(
                 Button("Play", id="play", variant="success"),
                 Button("Export", id="export", variant="primary"),
@@ -302,10 +339,15 @@ class WaveformApp(App):
         yield Footer()
         
 
+    @on(Input.Changed, "#dc-offset-input")
+    def on_changed(self, event: Input.Changed ):
+        # self.post_message(InputChanged(value=int(event.value)))
+        self.log("DC Offset changed to: ", event.value)
+        self.fx.set_dc_offset(event.value)
+
     @on(Button.Pressed, "#export")
     def export_pressed(self) -> None:
         """Pressed Export"""
-        # self.numbers = self.value = str(Decimal(self.value or "0") * -1)
 
     @on(Button.Pressed, "#play")
     def play_pressed(self) -> None:
@@ -320,13 +362,11 @@ class WaveformApp(App):
     @on(SelectionList.SelectedChanged)
     def update_selected_plugins(self, msg: SelectionList.SelectedChanged) -> None:
         for i in msg.selection_list.selected:
-            self.log(f"i: {i}")
-            self.log(f"h: {msg.selection_list}")
             self.fx.enable_plugin(i)
             # self.fx.disable_plugin
         disabled_plugins = [plug for plug in list(self.fx.get_pedalboard()) if plug.__class__.__name__ not in msg.selection_list.selected]
         for plug in disabled_plugins:
-            self.fx.disable_plugin(plug.__class__.__name__) # TODO this, combined with the disable_plugin logic, iss ridiculous
+            self.fx.disable_plugin(plug.__class__.__name__) # TODO this, combined with the disable_plugin logic, is ridiculous
         # self.log(f"msg.selection_list: {enumerate(msg.selection_list)}")
         # self.fx.enable_plugin
 
@@ -349,10 +389,14 @@ class WaveformCanvas(Canvas):
         """Called when the widget is mounted. Load and draw the waveform."""
         # self.draw_grid()
         self.load_and_draw_waveform()
+        self.border_subtitle = self.wav_file_path
+        self.border_title = self.window_title
+    # def compose(self) -> None:
+        
 
-
-    # def on_show(self) -> None: # TODO uncomment re-sizing logic
-    #     self.update_size()
+    def on_show(self) -> None: # TODO causes error when program quits?
+        
+        self.update_size()
 
     def update_size(self):
         source_handle = self.parent
@@ -360,7 +404,8 @@ class WaveformCanvas(Canvas):
         if width > 0 and height > 0:
             source_handle.remove_children("WaveformCanvas")
             twf = WaveformCanvas(self.wav_file_path, self.window_title, width, floor(height * 2))
-            twf.border_subtitle = self.border_subtitle
+            # twf.border_subtitle = self.border_subtitle
+            
             source_handle.mount(twf)
 
     def draw_grid(self):
