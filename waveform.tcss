@@ -7,6 +7,9 @@ WaveformCanvas {
     width: 1fr;
     height: 1fr;
     border: solid white;
+    scrollbar-size: 1 1;
+    overflow-y: hidden;
+    overflow-x: hidden;
 }
 
 #grid-prog{
@@ -20,6 +23,9 @@ WaveformCanvas {
     height: 1fr;
 }
 
-.waveform_display{
 
+
+.wf{
+    padding: 0;
+    margin: 0;
 }

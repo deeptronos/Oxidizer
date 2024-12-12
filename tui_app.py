@@ -1,6 +1,7 @@
 import sys
 import wave
 import numpy as np
+from math import floor
 from textual import events, on
 from textual.app import App, ComposeResult
 from textual_canvas import Canvas
@@ -133,15 +134,17 @@ class WaveformApp(App):
 
         with Container(id="grid-prog"):
             # yield Digits("Catherine's 0\u03c7idizer", id="logo")
-            self.source_wf = Container(WaveformCanvas(self.wav_file_path, 150, 20), classes="wf", id="source-wf")
+            self.source_wf = WaveformCanvas(self.wav_file_path, 20, 20)
+            self.source_canvas = Container(self.source_wf, classes="wf", id="source-wf")
             (temprate, tempdata, tempinfo, temppath) = self.ts.read()
-            self.modified_wf = Container(WaveformCanvas(temppath, 150, 20), classes="wf", id="modified-wf")
+            self.modified_wf = WaveformCanvas(temppath, 20, 20)
+            self.modified_canvas = Container(self.modified_wf, classes="wf", id="modified-wf")
             
 
             # self.mount(self.source_wf)
             # self.mount(self.modified_wf)
-            yield self.source_wf
-            yield self.modified_wf
+            yield self.source_canvas
+            yield self.modified_canvas
             yield Container(SelectionList(*SelectionPlugins()), id="plugins")
             yield Horizontal(
                 Button("Export", id="export", variant="primary"),
@@ -149,11 +152,13 @@ class WaveformApp(App):
             )
 
         yield Footer()
+        
 
     @on(Button.Pressed, "#export")
     def plus_minus_pressed(self) -> None:
         """Pressed Export"""
         # self.numbers = self.value = str(Decimal(self.value or "0") * -1)
+        self.update_canvas_size()
 
     def on_mount(self) -> None:
         self.query("#source-wf")[0].query_one("WaveformCanvas").border_title = "SOURCE"
@@ -163,12 +168,33 @@ class WaveformApp(App):
         self.query("#modified-wf")[0].query_one("WaveformCanvas").border_subtitle= f"{modified_subtitle}"
 
         self.query_one(SelectionList).border_title = "Audio Effects "
+        
+    def on_size(self):
+        self.update_canvas_size
+
+    def update_canvas_size(self):
+        for i in ["#source-wf", "#modified-wf"]:
+            #     container = self.query(i)[0]
+            #     width = container.size.width
+            #     height = container.size.height
+            source_handle =  self.query(i)[0]
+            # viewport = self.screen.size
+            width, height = (source_handle.container_size.width, source_handle.container_size.height)
+            if width > 0 and height > 0:
+                source_handle.remove_children("WaveformCanvas")
+                twf = WaveformCanvas(self.wav_file_path, width, floor(height * 2))
+                source_handle.mount(twf)
+                # self.log("h")
+            # self.log(f"Source handle: size: {source_handle.size}, container size: {source_handle.container_size}, container viewport: {source_handle.container_viewport}, virtual_region: {source_handle.virtual_region},  with margin: {source_handle.virtual_region_with_margin}, content size: {source_handle.content_size}, virtual size: {source_handle.virtual_size}, outer_size: {source_handle.outer_size}, get_content_width: {source_handle.get_content_width(source_handle.size,viewport)}")
+            # source_handle.mount(WaveformCanvas(self.wav_file_path, source_handle.size.width, source_handle.size.height * 2))
+            #     self.log(f"{i}: width: {width}, height: {height}")
 
 
 class WaveformCanvas(Canvas):
     """Canvas widget for drawing the waveform."""
 
     def __init__(self, wav_file_path, width, height, *args, **kwargs):
+        print("WaveformCanvas: width: {width}, height: {height}")
         super().__init__(*args, **kwargs, width=width, height=height)
         self.wav_file_path = wav_file_path
 
@@ -176,6 +202,21 @@ class WaveformCanvas(Canvas):
         """Called when the widget is mounted. Load and draw the waveform."""
         # self.draw_grid()
         self.load_and_draw_waveform()
+
+    def _on_click(self, event):
+        self.log("On click!!!")
+        self.update_size()
+        return super()._on_click(event)
+
+    def update_size(self):
+        if self.parent:
+            parent = self.parent
+            self.log(f"Update size!!!!!! self.parent.size: {self.parent.size}")
+            self.log("Add child...")
+            parent.compose_add_child(WaveformCanvas(self.wav_file_path, parent.size.width, parent.size.height))
+            # self.remove()
+            
+            
 
     def draw_grid(self):
         width, height = (self.width, self.height)
