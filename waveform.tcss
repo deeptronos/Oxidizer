@@ -18,7 +18,7 @@ WaveformCanvas {
     grid-columns:  1fr 1fr;
 }
 
-#plugins {
+#plugin-selection-list {
     width: 1fr;
     height: 1fr;
 }

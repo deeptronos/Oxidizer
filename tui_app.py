@@ -5,16 +5,50 @@ from math import floor
 from textual import events, on
 from textual.app import App, ComposeResult
 from textual_canvas import Canvas
-from textual.widgets import Header, Footer, Button, Digits, SelectionList, OptionList
+from textual.widget import Widget
+from textual.widgets import Header, Footer, Button, Digits, SelectionList, OptionList, Input
 from textual.widgets.selection_list import Selection
-from textual.containers import Container, Horizontal, Vertical
+from textual.message import Message
+from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
 from textual.color import Color
+from textual.events import Mount
 
 
+import importlib
+import sounddevice as sd
 import scipy.io.wavfile as wav
-from pedalboard import Plugin  # Pedalboard, Bitcrush
+from pedalboard import * #Plugin  # Pedalboard, Bitcrush # TODO explicitly import used Plugins to avoid syntax errors
 from pedalboard.io import AudioFile, AudioStream
 import numpy as np
+
+# Credit to https://stackoverflow.com/questions/12262463/print-out-the-class-parameters-on-python
+def filterFunction(field):
+    '''
+    This is a sample filtering function
+    '''
+    name, value = field
+    return not name.startswith("_")
+
+
+def get_all_methods_details(class_name):
+    out = []
+    for i,plugin in enumerate(filter(filterFunction, class_name.__dict__.items())):
+        print(i, plugin)
+        out.append((i, plugin))
+    return out
+
+
+def SelectionPlugins():
+    """A list of all plugins supplied to the user. Plugins originate from Pedalboard as well as myself."""
+    out = list()
+    for cls in Plugin.__subclasses__():
+        # s = Selection(cls.__name__, cls.__name__[::2])
+        s = Selection(cls.__name__, cls.__name__)
+        assert isinstance(s, Selection)
+        out.append(s)
+
+    return out
+
 
 class TempStore():
     """A class that can store one WAV file in `/temp`, for manipulation."""
@@ -36,14 +70,13 @@ class TempStore():
             self._rate = rate # Samplerate
             self._data = data # Original sample's data
             self._info = info # Data type info
-            print("Writing temp wav...")
             
         except FileNotFoundError:
-            print(f"Error: File not found: {self._originalpath}")
+            print(f"TempStore - Error: File not found: {self._originalpath}")
         except wave.Error as e:
-            print(f"Error reading WAV file: {e}")
+            print(f"TempStore - Error reading WAV file: {e}")
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            print(f"TempStore - An unexpected error occurred: {e}")
         wav.write(self._temppath, self._rate, self._data)
 
 
@@ -68,6 +101,7 @@ class TempStore():
         self._info = self._get_data_dtype(data)
         data = np.clip(data, self._info.min, self._info.max)  # Ensure data is within valid range
         wav.write(self._temppath, self._rate, data.astype(self._info.dtype))
+        
     
     def _read_from_temp(self):
         """Returns a tuple containing the (rate, data, info) read from temp store."""
@@ -106,15 +140,117 @@ class TempStore():
         return tuple(out)
 
 
-def SelectionPlugins():
-    """A list of all plugins supplied to the user. Plugins originate from Pedalboard as well as myself."""
-    out = list()
-    for cls in Plugin.__subclasses__():
-        s = Selection(cls.__name__, cls.__name__[::2])
-        assert isinstance(s, Selection)
-        out.append(s)
+class PluginInterfaceInput(Input):
+    """Responsible for a single input field in an interactable plugin."""
+    class InputChanged(Message):
+        """Input has been changed message."""
+        def __init__(self, paramname:str, value:int) -> None:
+            self.value = value
+            self.paramname =paramname
+            super.__init__()
 
-    return out
+    def __init__(self, placeholder, type):
+        super().__init__(placeholder=placeholder,type=type)
+    
+    def on_changed(self, event: Input.Changed ):
+        self.post_message(InputChanged(paramname=event.name,value=int(event.value)))
+
+
+class PluginWidget(Widget):
+    """Responsible for a single user-interactable plugin."""
+
+    def __init__(self, plugin:Plugin):
+        self._plugin : Plugin = plugin # TODO valid for Plugin subclasses?
+        self._pluginfo = get_all_methods_details(plugin)
+
+    def compose(self):
+        super().compose()
+        # return super().compose()
+        for i, param in get_all_methods_details(self._plugin):
+            name = param[0]
+            prop = param[1]
+            # yield Input(placeholder=name, type="integer")
+            yield PluginInterfaceInput(placeholder=name,type="integer")
+        yield
+    def on_mount(self) -> None:
+        self.border_title = self._plugin
+
+    def handle_input_changed(self, message:PluginInterfaceInput.InputChanged):
+        setattr(self._plugin, message.paramname, message.value)
+
+
+
+
+
+class AudioFX():
+    """Responsible for the FX applied to audio.
+Writes processed audio to the app's TempStore.
+FX are applied to audio in the order in which they are added to the Pedalboard.
+
+    """
+    def __init__(self, source_file_path:str, temp_store:TempStore):
+        self._source_file_path = source_file_path
+        self._pedalboard = Pedalboard()
+        self._ts = temp_store
+        self._load_source_audio()
+
+    def _load_source_audio(self):
+        """Read data from the file at _source_file_path into _data"""
+        (self._rate, self._source_data, self._info, self._temppath) = self._ts.read()
+        
+    def _apply_fx_to_source(self):
+        """Store the processed audio in _data into the TempStore."""
+        # self._temppath
+        with AudioFile(self._source_file_path) as infile:
+            with AudioFile(self._temppath, 'w', infile.samplerate, infile.num_channels) as outfile:
+                while infile.tell() < infile.frames:
+                    chunk = infile.read(infile.samplerate * infile.duration) # TODO is this *that* bad for memory ;3
+            
+                effected = self._pedalboard(chunk, infile.samplerate, reset=True)
+
+                outfile.write(effected)
+
+    def enable_plugin(self, plugin_name:str):
+        """Add the given plugin to the end of the Pedalboard Effects chain."""
+        module = importlib.import_module("pedalboard")
+        class_ = getattr(module, plugin_name)
+        if(class_() not in list(self._pedalboard)):
+
+            self._pedalboard.append(class_())
+            self._apply_fx_to_source()
+        else:
+            pass
+
+    def disable_plugin(self, plugin_name:str):
+        """Remove the given plugin from the Pedalboard Effects chain."""
+        module = importlib.import_module("pedalboard")
+        class_ = getattr(module, plugin_name)
+        if(class_() in list(self._pedalboard)):
+            self._pedalboard.remove(class_())
+            self._apply_fx_to_source()
+        else:
+            pass
+
+    def get_pedalboard(self) -> Pedalboard:
+        return self._pedalboard
+
+class PluginContainer(ScrollableContainer):
+    """Responsible for a widget displaying active audio FX and their inputs.
+    """
+    def compose(self):
+        for i in list(self._fx.get_pedalboard()):
+            yield PluginWidget(i)
+        super().compose()
+
+    def set_fx_source(self, audio_fx:AudioFX):
+        """Set self._fx"""
+        self._fx = audio_fx
+
+    def _get_plugins(self):
+        """Get a list enumerating the active plugins in our pedalboard
+        """
+        return list(enumerate(self._fx.get_pedalboard()))
+    
 
 
 class WaveformApp(App):
@@ -126,10 +262,13 @@ class WaveformApp(App):
         super().__init__()
         self.wav_file_path = wav_file_path
         self.ts = TempStore(self.wav_file_path) # The TempStore() backing the output waveform.
+        self.audio_device_name = sd.query_devices()[len(sd.query_devices()) -1 ]['name'] # TODO better solution than just picking the last one...
+
+        self.fx = AudioFX(self.wav_file_path, self.ts)
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
-        yield Digits("Catherine's 0\u03c7idizer", id="logo")
+        yield Digits("0\u03c7idizer", id="logo")
         yield Header()
 
         with Container(id="grid-prog"):
@@ -145,39 +284,50 @@ class WaveformApp(App):
             # self.mount(self.modified_wf)
             yield self.source_canvas
             yield self.modified_canvas
-            yield Container(SelectionList(*SelectionPlugins()), id="plugins")
+            yield Container(SelectionList(*SelectionPlugins()), id="plugin-selection-list")
+            self._plugin_interactables = PluginContainer()
+            self._plugin_interactables.set_fx_source(self.fx)
+            self._interactions = Container(self._plugin_interactables,id="plugin-interactions")
             yield Horizontal(
-                Button("Export", id="export", variant="primary"),
                 Button("Play", id="play", variant="success"),
+                Button("Export", id="export", variant="primary"),
             )
 
         yield Footer()
         
 
     @on(Button.Pressed, "#export")
-    def plus_minus_pressed(self) -> None:
+    def export_pressed(self) -> None:
         """Pressed Export"""
         # self.numbers = self.value = str(Decimal(self.value or "0") * -1)
 
+    @on(Button.Pressed, "#play")
+    def play_pressed(self) -> None:
+        """Pressed Play"""
+        self.log("Play pressed!")
+        (rate, data, info, temppath) = self.ts.read()
+        with AudioFile(temppath) as f:
+            chunk = f.read(f.samplerate * f.duration)
+        AudioStream.play(chunk, f.samplerate, self.audio_device_name)
+
+    # @on(Mount)
+    @on(SelectionList.SelectedChanged)
+    def update_selected_plugins(self, msg: SelectionList.SelectedChanged) -> None:
+        for i in msg.selection_list.selected:
+            self.log(f"i: {i}")
+            self.log(f"h: {msg.selection_list}")
+            self.fx.enable_plugin(i)
+            # self.fx.disable_plugin
+        disabled_plugins = [plug for plug in list(self.fx.get_pedalboard()) if plug not in msg.selection_list.selected]
+        for plug in disabled_plugins:
+            self.fx.disable_plugin(plug.__class__.__name__) # TODO this, combined with the disable_plugin logic, iss ridiculous
+        # self.log(f"msg.selection_list: {enumerate(msg.selection_list)}")
+        # self.fx.enable_plugin
 
     def on_mount(self) -> None:
         self.query_one(SelectionList).border_title = "Audio Effects"
 
-    # def update_canvas_size(self):
-    #     for i in ["#source-wf", "#modified-wf"]:
-    #         source_handle =  self.query(i)[0]
 
-    #         width, height = (source_handle.container_size.width, source_handle.container_size.height)
-    #         if width > 0 and height > 0:
-    #             source_handle.remove_children("WaveformCanvas")
-    #             twf = WaveformCanvas(self.wav_file_path, width, floor(height * 2))
-    #             source_handle.mount(twf)
-
-    #     self.query("#source-wf")[0].query_one("WaveformCanvas").border_title = "SOURCE"
-    #     self.query("#modified-wf")[0].query_one("WaveformCanvas").border_title = "RESULT"
-    #     (_, _, _, modified_subtitle) = self.ts.read()
-    #     self.query("#source-wf")[0].query_one("WaveformCanvas").border_subtitle= f"{self.wav_file_path}"
-    #     self.query("#modified-wf")[0].query_one("WaveformCanvas").border_subtitle= f"{modified_subtitle}"
 
 
 
@@ -185,10 +335,9 @@ class WaveformCanvas(Canvas):
     """Canvas widget for drawing the waveform."""
 
     def __init__(self, wav_file_path, window_title, width, height, *args, **kwargs):
-        print("WaveformCanvas: width: {width}, height: {height}")
         super().__init__(*args, **kwargs, width=width, height=height)
         self.wav_file_path = wav_file_path
-        self.window_title = window_title;
+        self.window_title = window_title
     
     def on_mount(self) -> None:
         """Called when the widget is mounted. Load and draw the waveform."""
@@ -196,13 +345,8 @@ class WaveformCanvas(Canvas):
         self.load_and_draw_waveform()
 
 
-    def on_show(self) -> None:
-        self.update_size()
-
-
-    # def on_resize(self) -> None:
-    #      self.update_size()
-
+    # def on_show(self) -> None: # TODO uncomment re-sizing logic
+    #     self.update_size()
 
     def update_size(self):
         source_handle = self.parent
@@ -212,25 +356,6 @@ class WaveformCanvas(Canvas):
             twf = WaveformCanvas(self.wav_file_path, self.window_title, width, floor(height * 2))
             twf.border_subtitle = self.border_subtitle
             source_handle.mount(twf)
-
-        # self.border_title = self.window_title
-        # self.border_subtitle = self.wav_file_path
-
-        #  def update_canvas_size(self):
-        # for i in ["#source-wf", "#modified-wf"]:
-        #     source_handle =  self.query(i)[0]
-
-        #     width, height = (source_handle.container_size.width, source_handle.container_size.height)
-        #     if width > 0 and height > 0:
-        #         source_handle.remove_children("WaveformCanvas")
-        #         twf = WaveformCanvas(self.wav_file_path, width, floor(height * 2))
-        #         source_handle.mount(twf)
-
-        # self.query("#source-wf")[0].query_one("WaveformCanvas").border_title = "SOURCE"
-        # self.query("#modified-wf")[0].query_one("WaveformCanvas").border_title = "RESULT"
-        # (_, _, _, modified_subtitle) = self.ts.read()
-        # self.query("#source-wf")[0].query_one("WaveformCanvas").border_subtitle= f"{self.wav_file_path}"
-        # self.query("#modified-wf")[0].query_one("WaveformCanvas").border_subtitle= f"{modified_subtitle}"
 
     def draw_grid(self):
         width, height = (self.width, self.height)
