@@ -295,7 +295,7 @@ class WaveformApp(App):
         super().__init__()
         self.wav_file_path = wav_file_path
         self.ts = TempStore(self.wav_file_path) # The TempStore() backing the output waveform.
-        self.audio_device_name = sd.query_devices()[len(sd.query_devices()) - 2 ]['name'] # TODO better solution than just picking the last one...
+        self.audio_device_name = sd.query_devices()[len(sd.query_devices()) - 1 ]['name'] # TODO better solution than just picking the last one...
 
         self.fx = AudioFX(self.wav_file_path, self.ts)
 
