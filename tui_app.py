@@ -179,9 +179,6 @@ class PluginWidget(Widget):
         setattr(self._plugin, message.paramname, message.value)
 
 
-
-
-
 class AudioFX():
     """Responsible for the FX applied to audio.
 Writes processed audio to the app's TempStore.
@@ -200,11 +197,14 @@ FX are applied to audio in the order in which they are added to the Pedalboard.
         
     def _apply_fx_to_source(self):
         """Store the processed audio in _data into the TempStore."""
+        print(f"apply fx to source. fx:")
+        for i in list(self._pedalboard):
+            print(f"\t{i}")
         # self._temppath
         with AudioFile(self._source_file_path) as infile:
             with AudioFile(self._temppath, 'w', infile.samplerate, infile.num_channels) as outfile:
                 while infile.tell() < infile.frames:
-                    chunk = infile.read(infile.samplerate * infile.duration) # TODO is this *that* bad for memory ;3
+                    chunk = infile.read(infile.samplerate * infile.duration) # TODO this is not so good for memory ;3
             
                 effected = self._pedalboard(chunk, infile.samplerate, reset=True)
 
@@ -212,9 +212,10 @@ FX are applied to audio in the order in which they are added to the Pedalboard.
 
     def enable_plugin(self, plugin_name:str):
         """Add the given plugin to the end of the Pedalboard Effects chain."""
+        print(f"enable_plugin: {plugin_name}")
         module = importlib.import_module("pedalboard")
         class_ = getattr(module, plugin_name)
-        if(class_() not in list(self._pedalboard)):
+        if(class_().__class__.__name__ not in [activeplugin.__class__.__name__ for activeplugin in list(self._pedalboard)]):
 
             self._pedalboard.append(class_())
             self._apply_fx_to_source()
@@ -223,10 +224,15 @@ FX are applied to audio in the order in which they are added to the Pedalboard.
 
     def disable_plugin(self, plugin_name:str):
         """Remove the given plugin from the Pedalboard Effects chain."""
+        print(f"disable_plugin: {plugin_name}")
         module = importlib.import_module("pedalboard")
         class_ = getattr(module, plugin_name)
-        if(class_() in list(self._pedalboard)):
-            self._pedalboard.remove(class_())
+        if(class_().__class__.__name__ in [activeplugin.__class__.__name__ for activeplugin in list(self._pedalboard)]):
+            for i in range(0, len(self._pedalboard)):
+                if self._pedalboard[i].__class__.__name__ == class_().__class__.__name__:
+                    del self._pedalboard[i]
+                    break
+            # self._pedalboard.remove(class_().__class__.__name__)
             self._apply_fx_to_source()
         else:
             pass
@@ -262,7 +268,7 @@ class WaveformApp(App):
         super().__init__()
         self.wav_file_path = wav_file_path
         self.ts = TempStore(self.wav_file_path) # The TempStore() backing the output waveform.
-        self.audio_device_name = sd.query_devices()[len(sd.query_devices()) -1 ]['name'] # TODO better solution than just picking the last one...
+        self.audio_device_name = sd.query_devices()[len(sd.query_devices()) - 2 ]['name'] # TODO better solution than just picking the last one...
 
         self.fx = AudioFX(self.wav_file_path, self.ts)
 
@@ -318,7 +324,7 @@ class WaveformApp(App):
             self.log(f"h: {msg.selection_list}")
             self.fx.enable_plugin(i)
             # self.fx.disable_plugin
-        disabled_plugins = [plug for plug in list(self.fx.get_pedalboard()) if plug not in msg.selection_list.selected]
+        disabled_plugins = [plug for plug in list(self.fx.get_pedalboard()) if plug.__class__.__name__ not in msg.selection_list.selected]
         for plug in disabled_plugins:
             self.fx.disable_plugin(plug.__class__.__name__) # TODO this, combined with the disable_plugin logic, iss ridiculous
         # self.log(f"msg.selection_list: {enumerate(msg.selection_list)}")
