@@ -4,6 +4,15 @@ This is a program that can be used to apply various types of distortion and reso
 
 It is written in Python. It uses the Pedalboard library for many audio effects, and the Textual library to implement a TUI.
 
+# Run the app
+```sh
+python3 -m tui_app <path_to_WAV>
+```
+
+for example:
+```sh
+python3 -m tui_app audio/demo/Loop2.wav
+```
 
 
 **Note:** this program isn't finished! There are many finishing touches I'd like to add to it. Right now, DC offset doesn't work at all, but all Plugins should do their thing. You can hear their results after enabling them by pressing "Play".
