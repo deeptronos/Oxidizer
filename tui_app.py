@@ -13,6 +13,7 @@ from textual.containers import Container, Horizontal, Vertical, ScrollableContai
 from textual.color import Color
 from textual.events import Mount
 from textual.widgets.option_list import Option, Separator
+from textual.reactive import reactive
 
 
 
@@ -63,10 +64,18 @@ def options_audiodevices():
     return out
 
 class AudioDeviceSelectWidget(OptionList):
-    def compose(self):
+    selected_device = reactive
+    def on_mount(self):
         devs = options_audiodevices()
         self.log(devs)
         yield OptionList(*devs)
+
+    @on(OptionList.OptionHighlighted)
+    def on_changed(self):
+        highlighted = self.query_one(Option).highlighted
+        self.log(f"OptionHighlighted! highlighted: {highlighted}")
+        # self.query()
+
 
 class TempStore():
     """A class that can store one WAV file in `/temp`, for manipulation."""
@@ -353,13 +362,14 @@ class WaveformApp(App):
             # self._audio_device_picker = AudioDeviceSelectWidget()
 
             # yield self._audio_device_picker
-            yield OptionList(*options_audiodevices(), id="device-select")
+            yield AudioDeviceSelectWidget(*options_audiodevices(), id="device-select")
             yield Horizontal(
                 Button("Play", id="play", variant="success"),
                 Button("Export", id="export", variant="primary"),
             )
 
         yield Footer()
+     
         
 
     @on(Input.Changed, "#dc-offset-input")
@@ -393,9 +403,10 @@ class WaveformApp(App):
         # self.log(f"msg.selection_list: {enumerate(msg.selection_list)}")
         # self.fx.enable_plugin
 
+   
     def on_mount(self) -> None:
-        self.query_one(SelectionList).border_title = "Audio Effects"
-        self.query("#device-select")[0].border_title = "Device Select"
+        self.query_one(SelectionList).border_title = "AUDIO EFFECTS"
+        self.query("#device-select")[0].border_title = "OUTPUT DEVICE"
         # self.log(f"CTEST _ QUERY CHILDREN: {self.query("device-select")}")
 
 
