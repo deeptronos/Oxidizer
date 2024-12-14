@@ -24,6 +24,7 @@ The program uses `/temp/temp.wav` to store the most recent version of the OUTPUT
 
 # TODO
 - Add pip install requirements
+- Allow audio device specification from command line/at entrypoint
 - Fix DC Offset type conversion errors... seems to be a np issue
 - Finish implementing tui for controlling plugin params?
 - Implement export button

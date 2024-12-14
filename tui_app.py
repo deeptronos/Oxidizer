@@ -12,6 +12,8 @@ from textual.message import Message
 from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
 from textual.color import Color
 from textual.events import Mount
+from textual.widgets.option_list import Option, Separator
+
 
 
 import importlib
@@ -38,7 +40,7 @@ def get_all_methods_details(class_name):
     return out
 
 
-def SelectionPlugins():
+def selection_plugins():
     """A list of all Pedalboard plugins supplied to the user."""
     out = list()
     banned_plugins=["PluginContainer", "Convolution", "Resample", "IIRFilter", "PrimeWithSilenceTestPlugin", "AddLatency", "ResampleWithLatency", "FixedSizeBlockTestPlugin", "ForceMonoTestPlugin", "ExternalPlugin"]
@@ -52,6 +54,19 @@ def SelectionPlugins():
 
     return out
 
+def options_audiodevices():
+    out = list()
+    for i in sd.query_devices():
+        op = Option(i["name"],id=i["index"])
+        assert isinstance(op, Option)
+        out.append(op)
+    return out
+
+class AudioDeviceSelectWidget(OptionList):
+    def compose(self):
+        devs = options_audiodevices()
+        self.log(devs)
+        yield OptionList(*devs)
 
 class TempStore():
     """A class that can store one WAV file in `/temp`, for manipulation."""
@@ -317,20 +332,28 @@ class WaveformApp(App):
             # self.mount(self.modified_wf)
             yield self.source_canvas
             yield self.modified_canvas
-            yield Container(SelectionList(*SelectionPlugins()), id="plugin-selection-list")
+            yield Container(SelectionList(*selection_plugins()), id="plugin-selection-list")
             self._plugin_interactables = PluginContainer()
             self._plugin_interactables.set_fx_source(self.fx)
             # with Container(id="dc-offset"):
             #     yield Label("DC OFFSET:")
             #     yield Input(placeholder="0", type="integer")
-            dc_input = Input(placeholder="0", type="integer", id="dc-offset-input")
-            dc_input.border_title = "DC Offset"
-            dc_input.border_subtitle = "Press <enter> to submit."
-            yield Horizontal(
-                dc_input
-            )
+            # dc_input = Input(placeholder="0", type="integer", id="dc-offset-input")
+            # dc_input.border_title = "DC Offset"
+            # dc_input.border_subtitle = "Press <enter> to submit."
+            # yield Horizontal(
+            #     dc_input
+            # )
+
             self._interactions = Container(self._plugin_interactables,id="plugin-interactions")
            
+            self._plugin_interactables = PluginContainer()
+            self._plugin_interactables.set_fx_source(self.fx)
+            
+            # self._audio_device_picker = AudioDeviceSelectWidget()
+
+            # yield self._audio_device_picker
+            yield OptionList(*options_audiodevices(), id="device-select")
             yield Horizontal(
                 Button("Play", id="play", variant="success"),
                 Button("Export", id="export", variant="primary"),
@@ -356,7 +379,7 @@ class WaveformApp(App):
         (rate, data, info, temppath) = self.ts.read()
         with AudioFile(temppath) as f:
             chunk = f.read(f.samplerate * f.duration)
-        AudioStream.play(chunk, f.samplerate, self.audio_device_name)
+        AudioStream.play(audio=chunk, sample_rate=f.samplerate, output_device_name=self.audio_device_name)
 
     # @on(Mount)
     @on(SelectionList.SelectedChanged)
@@ -372,7 +395,8 @@ class WaveformApp(App):
 
     def on_mount(self) -> None:
         self.query_one(SelectionList).border_title = "Audio Effects"
-
+        self.query("#device-select")[0].border_title = "Device Select"
+        # self.log(f"CTEST _ QUERY CHILDREN: {self.query("device-select")}")
 
 
 
@@ -394,9 +418,9 @@ class WaveformCanvas(Canvas):
     # def compose(self) -> None:
         
 
-    def on_show(self) -> None: # TODO causes error when program quits?
+    # def on_show(self) -> None: # TODO causes error when program quits? TODO uncomment to make waveforms work :P
         
-        self.update_size()
+    #     self.update_size()
 
     def update_size(self):
         source_handle = self.parent
